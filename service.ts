@@ -29,7 +29,7 @@ export const generateTTS = async ({
       {
         headers: {
           "Content-Type": "application/json",
-          "api-subscription-key": "my-sarvam-api", // move to .env in production
+          "api-subscription-key": "my sarvap api", // move to .env in production
         },
       },
     );

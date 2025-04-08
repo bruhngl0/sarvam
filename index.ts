@@ -15,7 +15,10 @@ app.get("/", (res: any) => {
 
 // Endpoint to handle audio file upload and transcription
 app.post("/upload", async (req: any, res: any) => {
-  const audioFilePath = path.join(__dirname, "../../Downloads/telgu1.wav"); // Replace with your audio file path
+  const audioFilePath = path.join(
+    __dirname,
+    "../../Desktop/call-agent-inputs/hindi-input.wav",
+  ); // Replace with your audio file path
 
   if (!fs.existsSync(audioFilePath)) {
     return res.status(400).send("Audio file not found.");
@@ -37,7 +40,7 @@ app.post("/upload", async (req: any, res: any) => {
     // Set up headers
     const headers = {
       ...formData.getHeaders(),
-      "api-subscription-key": "my-sarvam-api", // Replace with your Sarvam API key
+      "api-subscription-key": "MY SARVAM API", // Replace with your Sarvam API key
     };
 
     // Make the API request
@@ -76,7 +79,7 @@ app.post("/upload", async (req: any, res: any) => {
       {
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer groqApi`, // Store your API key in .env
+          Authorization: `Bearer my groq api`, // Store your API key in .env
         },
       },
     );
