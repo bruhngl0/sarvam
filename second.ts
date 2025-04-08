@@ -60,9 +60,9 @@ app.post("/recording", async (req: any, res: any) => {
       auth: {
         username:
           process.env.TWILIO_ACCOUNT_SID! ||
-          "AC854572ba696a00fb3ad38b1cd3bc8ee5",
+          "twilio-sid",
         password:
-          process.env.TWILIO_AUTH_TOKEN! || "f6fbdef49232b0a4cb7d610e71eeaf98",
+          process.env.TWILIO_AUTH_TOKEN! || "twilio-token",
       },
     });
     const audioBuffer = Buffer.from(audioRes.data);
@@ -87,7 +87,7 @@ app.post("/recording", async (req: any, res: any) => {
           ...formData.getHeaders(),
           "api-subscription-key":
             process.env.SARVAM_API_KEY ||
-            "dc39ab8c-dcb4-4f7d-b082-b93b63cc40ec",
+            "my-sarvam-apikey",
         },
       },
     );
@@ -106,7 +106,7 @@ app.post("/recording", async (req: any, res: any) => {
       {
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${process.env.GROQ_API_KEY || "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"}`,
+          Authorization: `Bearer ${process.env.GROQ_API_KEY || "my-groq-apikey"}`,
         },
       },
     );
@@ -131,7 +131,7 @@ app.post("/recording", async (req: any, res: any) => {
     console.log("Audio file saved to:", outputFile);
 
     const ngrokUrl =
-      process.env.NGROK_URL || "8458-49-207-242-13.ngrok-free.app";
+      process.env.NGROK_URL || "8458-49-207-242-13.ngrok-free.app"; //change this accordingly--change this in webhook in twilio dashboard
     const response = new TwilioTwiml.VoiceResponse();
     response.play(`https://${ngrokUrl}/audio/${uniqueFilename}`);
 
@@ -164,7 +164,7 @@ app.post("/upload", async (req: any, res: any) => {
 
     const headers = {
       ...formData.getHeaders(),
-      "api-subscription-key": process.env.SARVAM_API_KEY || "",
+      "api-subscription-key": process.env.SARVAM_API_KEY || "my sarvam apikey",
     };
 
     const apiResponse = await axios.post(
@@ -199,7 +199,7 @@ app.post("/upload", async (req: any, res: any) => {
       {
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${process.env.GROQ_API_KEY || ""}`,
+          Authorization: `Bearer ${process.env.GROQ_API_KEY || "gro-api-key"}`,
         },
       },
     );
