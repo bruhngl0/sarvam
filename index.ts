@@ -4,6 +4,7 @@ import fs from "fs";
 import FormData from "form-data";
 import path from "path";
 import { writeFileSync } from "fs";
+import { generateTTS } from "./service";
 
 const app = express();
 const port = 3000;
@@ -14,7 +15,7 @@ app.get("/", (res: any) => {
 
 // Endpoint to handle audio file upload and transcription
 app.post("/upload", async (req: any, res: any) => {
-  const audioFilePath = path.join(__dirname, "../../Downloads/sample4.wav"); // Replace with your audio file path
+  const audioFilePath = path.join(__dirname, "../../Downloads/telgu1.wav"); // Replace with your audio file path
 
   if (!fs.existsSync(audioFilePath)) {
     return res.status(400).send("Audio file not found.");
@@ -36,7 +37,7 @@ app.post("/upload", async (req: any, res: any) => {
     // Set up headers
     const headers = {
       ...formData.getHeaders(),
-      "api-subscription-key": "sarvam-api-key", // Replace with your Sarvam API key
+      "api-subscription-key": "my-sarvam-api", // Replace with your Sarvam API key
     };
 
     // Make the API request
@@ -48,7 +49,6 @@ app.post("/upload", async (req: any, res: any) => {
 
     // Log the response
     console.log("API Response:", apiResponse.data);
-    res.json(apiResponse.data);
 
     //----- send the transcript to groq and get the response
 
@@ -58,6 +58,7 @@ app.post("/upload", async (req: any, res: any) => {
     }
 
     const language_code = apiResponse.data.language_code;
+    console.log(language_code);
 
     const groqPayload = {
       model: "llama-3.3-70b-versatile",
@@ -75,7 +76,7 @@ app.post("/upload", async (req: any, res: any) => {
       {
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer groq-api-key`, // Store your API key in .env
+          Authorization: `Bearer groqApi`, // Store your API key in .env
         },
       },
     );
@@ -87,9 +88,32 @@ app.post("/upload", async (req: any, res: any) => {
     const limitedReply = reply.slice(0, 100).trim();
     console.log("Limited Groq Reply:", limitedReply);
 
+    const audioUrl = await generateTTS({
+      text: limitedReply,
+      languageCode: language_code,
+    });
+
+    if (!audioUrl) {
+      console.log("TTS audio URL not generated");
+    } else {
+      console.log("TTS Audio URL:", audioUrl);
+    }
+
+    const base64Audio = audioUrl;
+    if (!base64Audio) {
+      return res.status(500).send("No base64 audio found in TTS response.");
+    }
+
+    // Convert base64 to binary and save as .mp3 (or .wav depending on sample rate)
+    const outputFile = path.join(__dirname, "output_audio10.mp3");
+    const audioBuffer = Buffer.from(base64Audio, "base64");
+
+    writeFileSync(outputFile, audioBuffer);
+    console.log("Audio file saved to:", outputFile);
+
     // Send the response back to the client
 
-    const ttsPayload = {
+    /* const ttsPayload = {
       inputs: [reply],
       target_language_code: language_code, // or "en-IN", "bn-IN" etc
       speaker: "meera",
@@ -107,26 +131,16 @@ app.post("/upload", async (req: any, res: any) => {
       {
         headers: {
           "Content-Type": "application/json",
-          "api-subscription-key": "sarvam-api-key",
+          "api-subscription-key": "dc39ab8c-dcb4-4f7d-b082-b93b63cc40ec",
         },
       },
     );
 
     const audioUrl = ttsRes.data.audios?.[0];
-
-    console.log("TTS Audio URL:", audioUrl);
-
-    const base64Audio = audioUrl;
-    if (!base64Audio) {
-      return res.status(500).send("No base64 audio found in TTS response.");
+    if (!audioUrl) {
+      console.log("data not present");
     }
-
-    // Convert base64 to binary and save as .mp3 (or .wav depending on sample rate)
-    const outputFile = path.join(__dirname, "output_audio1.mp3");
-    const audioBuffer = Buffer.from(base64Audio, "base64");
-
-    writeFileSync(outputFile, audioBuffer);
-    console.log("Audio file saved to:", outputFile);
+    console.log("TTS Audio URL:", audioUrl); */
   } catch (error) {
     console.error("Error transcribing audio:", error);
     res.status(500).send("Server error.");
