@@ -1,5 +1,3 @@
-
-
 import express, { Request, Response } from "express";
 import axios from "axios";
 import fs from "fs";
@@ -15,19 +13,11 @@ const port = 3000;
 
 // Use body-parser to parse form data from Twilio
 app.use(bodyParser.urlencoded({ extended: false }));
+app.use("/audio", express.static(path.join(__dirname, "public/audio")));
 
 // Basic route to check if server is running
 app.get("/", (req: any, res: any) => {
   res.json("server running");
-});
-
-// Endpoint to serve audio files
-app.get("/audio/:filename", (req: any, res: any) => {
-  const audioPath = path.join(__dirname, req.params.filename);
-  if (!fs.existsSync(audioPath)) {
-    return res.status(404).send("Audio file not found");
-  }
-  res.type("audio/mpeg").sendFile(audioPath);
 });
 
 // Entry point for call
@@ -50,22 +40,38 @@ app.post("/recording", async (req: any, res: any) => {
 
   try {
     const cleanUrl = recordingUrl.replace(
-      /^https?:\\/\\/[^/]+/,
+      /^https?:\/\/[^/]+/,
       "https://api.twilio.com",
     );
     console.log(cleanUrl);
     // 1️⃣ Get audio from Twilio
-    const audioRes = await axios.get(`${cleanUrl}.wav`, {
-      responseType: "arraybuffer",
-      auth: {
-        username:
-          process.env.TWILIO_ACCOUNT_SID! ||
-          "twilio-sid",
-        password:
-          process.env.TWILIO_AUTH_TOKEN! || "twilio-token",
-      },
-    });
-    const audioBuffer = Buffer.from(audioRes.data);
+    // 1️⃣ Get audio from Twilio (.mp3 preferred, fallback to .wav after delay)
+    const fetchAudio = async (format: "mp3" | "wav") => {
+      const url = `${cleanUrl}.${format}`;
+      try {
+        const res = await axios.get(url, {
+          responseType: "arraybuffer",
+          auth: {
+            username:
+              process.env.TWILIO_ACCOUNT_SID! ||
+              "AC854572ba696a00fb3ad38b1cd3bc8ee5",
+            password:
+              process.env.TWILIO_AUTH_TOKEN! ||
+              "586e98ad603ae1ab44fe12648584451c",
+          },
+        });
+        return res.data;
+      } catch (err: any) {
+        if (err.response?.status === 404 && format === "mp3") {
+          console.log("MP3 not found, retrying WAV after 2s...");
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+          return fetchAudio("wav");
+        }
+        throw err;
+      }
+    };
+
+    const audioBuffer = Buffer.from(await fetchAudio("mp3"));
 
     // 2️⃣ Send audio buffer to Sarvam STT
     const formData = new FormData();
@@ -87,7 +93,7 @@ app.post("/recording", async (req: any, res: any) => {
           ...formData.getHeaders(),
           "api-subscription-key":
             process.env.SARVAM_API_KEY ||
-            "my-sarvam-apikey",
+            "dc39ab8c-dcb4-4f7d-b082-b93b63cc40ec",
         },
       },
     );
@@ -106,7 +112,7 @@ app.post("/recording", async (req: any, res: any) => {
       {
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${process.env.GROQ_API_KEY || "my-groq-apikey"}`,
+          Authorization: `Bearer ${process.env.GROQ_API_KEY || "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"}`,
         },
       },
     );
@@ -125,19 +131,22 @@ app.post("/recording", async (req: any, res: any) => {
     }
 
     const uniqueFilename = `output_audio_${Date.now()}.mp3`;
-    const outputFile = path.join(__dirname, uniqueFilename);
+    const outputFile = path.join(__dirname, "public/audio", uniqueFilename);
     const audioBufferReply = Buffer.from(base64Audio, "base64");
     writeFileSync(outputFile, audioBufferReply);
     console.log("Audio file saved to:", outputFile);
 
     const ngrokUrl =
-      process.env.NGROK_URL || "8458-49-207-242-13.ngrok-free.app"; //change this accordingly--change this in webhook in twilio dashboard
+      process.env.NGROK_URL || "aef8-49-207-245-144.ngrok-free.app"; //change this accordingly--change this in webhook in twilio dashboard
     const response = new TwilioTwiml.VoiceResponse();
+    if (!response) {
+      console.log("no response from twilio");
+    }
     response.play(`https://${ngrokUrl}/audio/${uniqueFilename}`);
 
     res.type("text/xml").send(response.toString());
   } catch (error) {
-    console.error("❌ Error handling call:", error);
+    console.error(" Error handling call:", error);
     const fail = new TwilioTwiml.VoiceResponse();
     fail.say("Something went wrong. Please try again.");
     res.type("text/xml").send(fail.toString());
@@ -145,104 +154,7 @@ app.post("/recording", async (req: any, res: any) => {
 });
 
 // For testing purpose
-app.post("/upload", async (req: any, res: any) => {
-  const audioFilePath = path.join(__dirname, "../../Downloads/telgu1.wav");
-
-  if (!fs.existsSync(audioFilePath)) {
-    return res.status(400).send("Audio file not found.");
-  }
-
-  try {
-    const audioFile = fs.createReadStream(audioFilePath);
-    const formData = new FormData();
-    formData.append("file", audioFile, "audio.mp3");
-    formData.append("model", "saarika:v2");
-    formData.append("language_code", "unknown");
-    formData.append("with_timestamps", "false");
-    formData.append("with_diarization", "false");
-    formData.append("num_speakers", "1");
-
-    const headers = {
-      ...formData.getHeaders(),
-      "api-subscription-key": process.env.SARVAM_API_KEY || "my sarvam apikey",
-    };
-
-    const apiResponse = await axios.post(
-      "https://api.sarvam.ai/speech-to-text",
-      formData,
-      { headers: headers },
-    );
-
-    console.log("API Response:", apiResponse.data);
-
-    const transcript = apiResponse.data.transcript;
-    if (!transcript) {
-      return res.status(500).send("No transcript found in Sarvam response.");
-    }
-
-    const language_code = apiResponse.data.language_code;
-    console.log(language_code);
-
-    const groqPayload = {
-      model: "llama-3.3-70b-versatile",
-      messages: [
-        {
-          role: "user",
-          content: transcript,
-        },
-      ],
-    };
-
-    const groqRes = await axios.post(
-      "https://api.groq.com/openai/v1/chat/completions",
-      groqPayload,
-      {
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${process.env.GROQ_API_KEY || "gro-api-key"}`,
-        },
-      },
-    );
-
-    const reply = groqRes.data.choices[0].message.content;
-    console.log("Transcript:", transcript);
-    console.log("Groq Reply:", reply);
-
-    const limitedReply = reply.slice(0, 100).trim();
-    console.log("Limited Groq Reply:", limitedReply);
-
-    const audioUrl = await generateTTS({
-      text: limitedReply,
-      languageCode: language_code,
-    });
-
-    if (!audioUrl) {
-      console.log("TTS audio URL not generated");
-      return res.status(500).send("TTS generation failed.");
-    }
-
-    console.log("TTS Audio data received");
-
-    const outputFile = path.join(__dirname, "output_audio_test.mp3");
-    const audioBuffer = Buffer.from(audioUrl, "base64");
-
-    writeFileSync(outputFile, audioBuffer);
-    console.log("Audio file saved to:", outputFile);
-
-    res.json({
-      transcript: transcript,
-      reply: limitedReply,
-      audioSaved: true,
-      audioPath: outputFile,
-    });
-  } catch (error) {
-    console.error("Error transcribing audio:", error);
-    res.status(500).send("Server error.");
-  }
-});
 
 app.listen(port, () => {
   console.log(`🚀 Server running at http://localhost:${port}`);
 });
-
-
